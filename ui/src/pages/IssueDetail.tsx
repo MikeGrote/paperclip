@@ -76,6 +76,7 @@ import { IssueScheduledRetryCard } from "../components/IssueScheduledRetryCard";
 import { IssueProperties } from "../components/IssueProperties";
 import { IssueRunLedger } from "../components/IssueRunLedger";
 import { IssueWorkspaceCard } from "../components/IssueWorkspaceCard";
+import { IssueWorkProductsPanel } from "../components/IssueWorkProductsPanel";
 import type { MentionOption } from "../components/MarkdownEditor";
 import { ImageGalleryModal } from "../components/ImageGalleryModal";
 import { ScrollToBottom } from "../components/ScrollToBottom";
@@ -3875,6 +3876,8 @@ export function IssueDetail() {
         project={resolvedProject}
         onUpdate={(data) => updateIssue.mutate(data)}
       />
+
+      <IssueWorkProductsPanel issueId={issue.id} />
 
       <Separator />
 

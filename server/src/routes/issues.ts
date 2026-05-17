@@ -1812,6 +1812,9 @@ export function issueRoutes(
       mentionedProjects,
       currentExecutionWorkspace,
       workProducts,
+      outcome: issue.outcomeKind
+        ? { kind: issue.outcomeKind, evidence: issue.outcomeEvidence ?? null }
+        : null,
     });
   });
 
@@ -2915,6 +2918,7 @@ export function issueRoutes(
       resume: resumeRequested,
       interrupt: interruptRequested,
       hiddenAt: hiddenAtRaw,
+      outcome: outcomeInput,
       ...updateFields
     } = req.body;
     const shouldCancelActiveRunForCancelledStatus =
@@ -2997,6 +3001,23 @@ export function issueRoutes(
 
     if (hiddenAtRaw !== undefined) {
       updateFields.hiddenAt = hiddenAtRaw ? new Date(hiddenAtRaw) : null;
+    }
+    // Apply outcome fields to the update patch
+    if (outcomeInput !== undefined) {
+      updateFields.outcomeKind = outcomeInput?.kind ?? null;
+      updateFields.outcomeEvidence = outcomeInput?.evidence ?? null;
+    }
+    // Enforce outcome when transitioning to done
+    const transitioningToDone = updateFields.status === "done" && existing.status !== "done";
+    if (transitioningToDone) {
+      const hasOutcome = outcomeInput?.kind ?? existing.outcomeKind;
+      if (!hasOutcome) {
+        res.status(422).json({
+          error: "An outcome is required when marking an issue as done. Provide an outcome.kind (e.g. merged_code, published_artifact, shipped_docs, explicit_decision, other).",
+          code: "outcome_required",
+        });
+        return;
+      }
     }
     if (
       commentBody &&

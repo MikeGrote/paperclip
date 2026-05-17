@@ -135,6 +135,19 @@ export const ISSUE_STATUSES = [
 ] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 
+/**
+ * Outcome kinds classify what type of deliverable an issue produced.
+ * An outcome must be recorded when transitioning an issue to "done".
+ */
+export const ISSUE_OUTCOME_KINDS = [
+  "merged_code",
+  "published_artifact",
+  "shipped_docs",
+  "explicit_decision",
+  "other",
+] as const;
+export type IssueOutcomeKind = (typeof ISSUE_OUTCOME_KINDS)[number];
+
 export const INBOX_MINE_ISSUE_STATUSES = [
   "backlog",
   "todo",
