@@ -10,6 +10,8 @@ We may accept contributions in the areas below, but if you want to work on roadm
 
 If you want to extend Paperclip today, the best path is often the [plugin system](doc/plugins/PLUGIN_SPEC.md). Community reference implementations are also useful feedback even when they are not merged directly into core.
 
+For a concrete, mergeable issue-slicing plan for the first two open roadmap themes, see [doc/plans/2026-05-17-roadmap-execution-artifacts-and-outcomes.md](doc/plans/2026-05-17-roadmap-execution-artifacts-and-outcomes.md).
+
 ## Milestones
 
 ### ✅ Plugin system
