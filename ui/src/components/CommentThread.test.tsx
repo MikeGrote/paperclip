@@ -299,6 +299,7 @@ describe("CommentThread", () => {
       type: "request_board_approval",
       requestedByAgentId: "agent-1",
       requestedByUserId: null,
+      reviewerAgentId: null,
       status: "pending",
       payload: {
         title: "Approve hosting spend",
@@ -306,6 +307,7 @@ describe("CommentThread", () => {
       },
       decisionNote: null,
       decidedByUserId: null,
+      decidedByAgentId: null,
       decidedAt: null,
       createdAt: new Date("2026-03-11T09:00:00.000Z"),
       updatedAt: new Date("2026-03-11T09:00:00.000Z"),

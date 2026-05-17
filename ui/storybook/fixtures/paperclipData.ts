@@ -1047,6 +1047,7 @@ export const storybookApprovals: Approval[] = [
     type: "hire_agent",
     requestedByAgentId: "agent-cto",
     requestedByUserId: null,
+    reviewerAgentId: null,
     status: "pending",
     payload: {
       name: "DesignSystemCoder",
@@ -1059,6 +1060,7 @@ export const storybookApprovals: Approval[] = [
     },
     decisionNote: null,
     decidedByUserId: null,
+    decidedByAgentId: null,
     decidedAt: null,
     createdAt: recent(42),
     updatedAt: recent(42),
@@ -1069,6 +1071,7 @@ export const storybookApprovals: Approval[] = [
     type: "budget_override_required",
     requestedByAgentId: "agent-codex",
     requestedByUserId: null,
+    reviewerAgentId: null,
     status: "revision_requested",
     payload: {
       scopeName: "Paperclip App",
@@ -1081,6 +1084,7 @@ export const storybookApprovals: Approval[] = [
     },
     decisionNote: "Need a tighter verification list before approving more spend.",
     decidedByUserId: "user-board",
+    decidedByAgentId: null,
     decidedAt: recent(12),
     createdAt: recent(75),
     updatedAt: recent(12),
@@ -1091,6 +1095,7 @@ export const storybookApprovals: Approval[] = [
     type: "request_board_approval",
     requestedByAgentId: "agent-cto",
     requestedByUserId: null,
+    reviewerAgentId: null,
     status: "approved",
     payload: {
       title: "Publish the Storybook preview for design review",
@@ -1104,6 +1109,7 @@ export const storybookApprovals: Approval[] = [
     },
     decisionNote: "Approved for internal-only review.",
     decidedByUserId: "user-board",
+    decidedByAgentId: null,
     decidedAt: recent(4),
     createdAt: recent(55),
     updatedAt: recent(4),

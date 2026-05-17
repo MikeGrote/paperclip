@@ -17,6 +17,13 @@ export const resolveApprovalSchema = z.object({
 
 export type ResolveApproval = z.infer<typeof resolveApprovalSchema>;
 
+/** Schema for agent-initiated approval decisions (qa_review flow) */
+export const agentResolveApprovalSchema = z.object({
+  decisionNote: multilineTextSchema.optional().nullable(),
+});
+
+export type AgentResolveApproval = z.infer<typeof agentResolveApprovalSchema>;
+
 export const requestApprovalRevisionSchema = z.object({
   decisionNote: multilineTextSchema.optional().nullable(),
 });

@@ -39,6 +39,7 @@ import {
   updateIssueWorkProductSchema,
   upsertIssueDocumentSchema,
   updateIssueSchema,
+  delegateIssueSchema,
   getClosedIsolatedExecutionWorkspaceMessage,
   isClosedIsolatedExecutionWorkspace,
   normalizeIssueIdentifier as normalizeIssueReferenceIdentifier,
@@ -3968,6 +3969,135 @@ export function issueRoutes(
     });
 
     res.json(result);
+  });
+
+  /**
+   * Agent-to-agent delegation: reassign an issue to a different agent.
+   * Allowed for: board users, agents with pm/cto/ceo role, or the current assignee.
+   */
+  router.post("/issues/:id/delegate", validate(delegateIssueSchema), async (req, res) => {
+    const id = req.params.id as string;
+    const issue = await svc.getById(id);
+    if (!issue) {
+      res.status(404).json({ error: "Issue not found" });
+      return;
+    }
+    assertCompanyAccess(req, issue.companyId);
+
+    const { targetAgentId, note: noteBody } = req.body as { targetAgentId: string; note?: string };
+
+    // Authorization: board, current assignee, or pm/cto/ceo agent in same company
+    if (req.actor.type === "agent") {
+      const actorAgentId = req.actor.agentId;
+      if (!actorAgentId) {
+        res.status(403).json({ error: "Agent authentication required" });
+        return;
+      }
+      const isCurrentAssignee = issue.assigneeAgentId === actorAgentId;
+      if (!isCurrentAssignee) {
+        const actorAgent = await agentsSvc.getById(actorAgentId);
+        const isDelegationRole =
+          actorAgent &&
+          actorAgent.companyId === issue.companyId &&
+          (actorAgent.role === "pm" || actorAgent.role === "cto" || actorAgent.role === "ceo");
+        const hasPermission = await access.hasPermission(issue.companyId, "agent", actorAgentId, "tasks:assign");
+        if (!isDelegationRole && !hasPermission) {
+          res.status(403).json({
+            error: "Only pm/cto/ceo agents or the current assignee can delegate issues",
+            details: { actorAgentId, assigneeAgentId: issue.assigneeAgentId },
+          });
+          return;
+        }
+      }
+    }
+
+    // Validate the target agent exists in the same company
+    const targetAgent = await agentsSvc.getById(targetAgentId);
+    if (!targetAgent || targetAgent.companyId !== issue.companyId) {
+      res.status(404).json({ error: "Target agent not found in this company" });
+      return;
+    }
+    if (targetAgent.status === "terminated") {
+      res.status(422).json({ error: "Cannot delegate to a terminated agent" });
+      return;
+    }
+
+    // Cancel any active run for the issue before reassigning
+    const activeRun = issue.status === "in_progress" ? await resolveActiveIssueRun(issue) : null;
+    let cancelledRunId: string | null = null;
+    if (activeRun) {
+      const cancelled = await heartbeat.cancelRun(activeRun.id);
+      if (cancelled) {
+        cancelledRunId = cancelled.id;
+      }
+    }
+
+    // Update the issue: reassign and reset to todo if it was in_progress
+    const newStatus = issue.status === "in_progress" ? "todo" : issue.status;
+    const actor = getActorInfo(req);
+    const updated = await svc.update(id, {
+      assigneeAgentId: targetAgentId,
+      ...(newStatus !== issue.status ? { status: newStatus } : {}),
+      actorAgentId: actor.agentId ?? null,
+      actorUserId: actor.actorType === "user" ? actor.actorId : null,
+    });
+    if (!updated) {
+      res.status(404).json({ error: "Issue not found" });
+      return;
+    }
+
+    // Add delegation note as a comment if provided
+    let comment = null;
+    if (noteBody) {
+      comment = await svc.addComment(id, noteBody, {
+        agentId: actor.agentId ?? undefined,
+        userId: actor.actorType === "user" ? actor.actorId : undefined,
+      });
+    }
+
+    await logActivity(db, {
+      companyId: issue.companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "issue.delegated",
+      entityType: "issue",
+      entityId: issue.id,
+      details: {
+        identifier: updated.identifier,
+        fromAgentId: issue.assigneeAgentId,
+        toAgentId: targetAgentId,
+        previousStatus: issue.status,
+        newStatus,
+        ...(cancelledRunId ? { cancelledRunId } : {}),
+        ...(comment ? { commentId: comment.id } : {}),
+      },
+    });
+
+    // Wake up the new assignee
+    if (newStatus !== "backlog") {
+      void heartbeat.wakeup(targetAgentId, {
+        source: "assignment",
+        triggerDetail: "system",
+        reason: "issue_delegated",
+        payload: {
+          issueId: issue.id,
+          mutation: "delegate",
+          ...(comment ? { commentId: comment.id } : {}),
+        },
+        requestedByActorType: actor.actorType,
+        requestedByActorId: actor.actorId,
+        contextSnapshot: {
+          issueId: issue.id,
+          taskId: issue.id,
+          source: "issue.delegate",
+          ...(comment ? { commentId: comment.id, wakeCommentId: comment.id } : {}),
+        },
+      }).catch((err) => logger.warn({ err, issueId: issue.id }, "failed to wake delegate assignee"));
+    }
+
+    res.json({ ...updated, ...(comment ? { comment } : {}) });
   });
 
   router.get("/issues/:id/comments", async (req, res) => {

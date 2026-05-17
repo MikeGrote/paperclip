@@ -441,6 +441,14 @@ export const checkoutIssueSchema = z.object({
 
 export type CheckoutIssue = z.infer<typeof checkoutIssueSchema>;
 
+/** Schema for agent-to-agent delegation of an issue */
+export const delegateIssueSchema = z.object({
+  targetAgentId: z.string().uuid(),
+  note: multilineTextSchema.pipe(z.string().min(1)).optional(),
+});
+
+export type DelegateIssue = z.infer<typeof delegateIssueSchema>;
+
 const commentMetadataLabelSchema = z.string().trim().min(1).max(120);
 const commentMetadataTextSchema = z.string().trim().min(1).max(2000);
 
