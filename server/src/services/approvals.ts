@@ -37,7 +37,7 @@ export function approvalService(db: Db) {
   async function resolveApproval(
     id: string,
     targetStatus: "approved" | "rejected",
-    decidedByUserId: string,
+    decidedBy: { userId: string; agentId?: undefined } | { agentId: string; userId?: undefined },
     decisionNote: string | null | undefined,
   ): Promise<ResolutionResult> {
     const existing = await getExistingApproval(id);
@@ -55,7 +55,8 @@ export function approvalService(db: Db) {
       .update(approvals)
       .set({
         status: targetStatus,
-        decidedByUserId,
+        decidedByUserId: decidedBy.userId ?? null,
+        decidedByAgentId: decidedBy.agentId ?? null,
         decisionNote: decisionNote ?? null,
         decidedAt: now,
         updatedAt: now,
@@ -103,7 +104,7 @@ export function approvalService(db: Db) {
       const { approval: updated, applied } = await resolveApproval(
         id,
         "approved",
-        decidedByUserId,
+        { userId: decidedByUserId },
         decisionNote,
       );
 
@@ -168,11 +169,22 @@ export function approvalService(db: Db) {
       return { approval: updated, applied };
     },
 
+    /** Approve a qa_review approval on behalf of an agent reviewer */
+    approveByAgent: async (id: string, decidedByAgentId: string, decisionNote?: string | null) => {
+      const { approval: updated, applied } = await resolveApproval(
+        id,
+        "approved",
+        { agentId: decidedByAgentId },
+        decisionNote,
+      );
+      return { approval: updated, applied };
+    },
+
     reject: async (id: string, decidedByUserId: string, decisionNote?: string | null) => {
       const { approval: updated, applied } = await resolveApproval(
         id,
         "rejected",
-        decidedByUserId,
+        { userId: decidedByUserId },
         decisionNote,
       );
 
@@ -184,6 +196,17 @@ export function approvalService(db: Db) {
         }
       }
 
+      return { approval: updated, applied };
+    },
+
+    /** Reject a qa_review approval on behalf of an agent reviewer */
+    rejectByAgent: async (id: string, decidedByAgentId: string, decisionNote?: string | null) => {
+      const { approval: updated, applied } = await resolveApproval(
+        id,
+        "rejected",
+        { agentId: decidedByAgentId },
+        decisionNote,
+      );
       return { approval: updated, applied };
     },
 

@@ -15,6 +15,7 @@ import type {
   IssueExecutionStateStatus,
   IssueOriginKind,
   IssuePriority,
+  IssueOutcomeKind,
   IssueRecoveryActionKind,
   IssueRecoveryActionOutcome,
   IssueRecoveryActionOwnerType,
@@ -32,6 +33,16 @@ import type { ExecutionWorkspace, IssueExecutionWorkspaceSettings } from "./work
 import type { IssueWorkProduct } from "./work-product.js";
 
 export type { IssueWorkMode };
+
+/**
+ * Outcome record attached to a completed issue.
+ * Describes what deliverable the issue produced when it reached "done".
+ */
+export interface IssueOutcome {
+  kind: IssueOutcomeKind;
+  /** Free-form text describing what was delivered (URL, PR link, decision summary, etc.) */
+  evidence: string | null;
+}
 
 export interface IssueAncestorProject {
   id: string;
@@ -496,6 +507,7 @@ export interface Issue {
   lastExternalCommentAt?: Date | null;
   lastActivityAt?: Date | null;
   isUnreadForMe?: boolean;
+  outcome?: IssueOutcome | null;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1589,6 +1589,8 @@ const issueListSelect = {
   completedAt: issues.completedAt,
   cancelledAt: issues.cancelledAt,
   hiddenAt: issues.hiddenAt,
+  outcomeKind: issues.outcomeKind,
+  outcomeEvidence: issues.outcomeEvidence,
   createdAt: issues.createdAt,
   updatedAt: issues.updatedAt,
 };

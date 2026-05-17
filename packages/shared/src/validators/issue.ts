@@ -13,6 +13,7 @@ import {
   ISSUE_COMMENT_PRESENTATION_KINDS,
   ISSUE_COMMENT_PRESENTATION_TONES,
   ISSUE_MONITOR_SCHEDULED_BY,
+  ISSUE_OUTCOME_KINDS,
   ISSUE_PRIORITIES,
   ISSUE_RECOVERY_ACTION_KINDS,
   ISSUE_RECOVERY_ACTION_OUTCOMES,
@@ -424,6 +425,10 @@ export const updateIssueSchema = createIssueBaseSchema.partial().extend({
   resume: z.boolean().optional(),
   interrupt: z.boolean().optional(),
   hiddenAt: z.string().datetime().nullable().optional(),
+  outcome: z.object({
+    kind: z.enum(ISSUE_OUTCOME_KINDS),
+    evidence: z.string().trim().max(1000).nullable().optional(),
+  }).nullable().optional(),
 });
 
 export type UpdateIssue = z.infer<typeof updateIssueSchema>;
@@ -435,6 +440,14 @@ export const checkoutIssueSchema = z.object({
 });
 
 export type CheckoutIssue = z.infer<typeof checkoutIssueSchema>;
+
+/** Schema for agent-to-agent delegation of an issue */
+export const delegateIssueSchema = z.object({
+  targetAgentId: z.string().uuid(),
+  note: multilineTextSchema.pipe(z.string().min(1)).optional(),
+});
+
+export type DelegateIssue = z.infer<typeof delegateIssueSchema>;
 
 const commentMetadataLabelSchema = z.string().trim().min(1).max(120);
 const commentMetadataTextSchema = z.string().trim().min(1).max(2000);

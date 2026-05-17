@@ -13,6 +13,12 @@ export const approvalsApi = {
     api.post<Approval>(`/approvals/${id}/approve`, { decisionNote }),
   reject: (id: string, decisionNote?: string) =>
     api.post<Approval>(`/approvals/${id}/reject`, { decisionNote }),
+  /** Agent-initiated approval for qa_review approvals (only the reviewer agent) */
+  agentApprove: (id: string, decisionNote?: string) =>
+    api.post<Approval>(`/approvals/${id}/agent-approve`, { decisionNote }),
+  /** Agent-initiated rejection for qa_review approvals (only the reviewer agent) */
+  agentReject: (id: string, decisionNote?: string) =>
+    api.post<Approval>(`/approvals/${id}/agent-reject`, { decisionNote }),
   requestRevision: (id: string, decisionNote?: string) =>
     api.post<Approval>(`/approvals/${id}/request-revision`, { decisionNote }),
   resubmit: (id: string, payload?: Record<string, unknown>) =>

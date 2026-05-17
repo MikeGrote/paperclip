@@ -2,6 +2,7 @@ import { Router, type Request } from "express";
 import type { Db } from "@paperclipai/db";
 import {
   addApprovalCommentSchema,
+  agentResolveApprovalSchema,
   createApprovalSchema,
   requestApprovalRevisionSchema,
   resolveApprovalSchema,
@@ -86,16 +87,25 @@ export function approvalRoutes(
           )
         : approvalInput.payload;
 
+    // For qa_review approvals, extract the designated reviewer agent from the payload
+    const reviewerAgentId =
+      approvalInput.type === "qa_review" &&
+      typeof (normalizedPayload as Record<string, unknown>)?.reviewerAgentId === "string"
+        ? ((normalizedPayload as Record<string, unknown>).reviewerAgentId as string)
+        : null;
+
     const actor = getActorInfo(req);
     const approval = await svc.create(companyId, {
       ...approvalInput,
       payload: normalizedPayload,
+      reviewerAgentId,
       requestedByUserId: actor.actorType === "user" ? actor.actorId : null,
       requestedByAgentId:
         approvalInput.requestedByAgentId ?? (actor.actorType === "agent" ? actor.actorId : null),
       status: "pending",
       decisionNote: null,
       decidedByUserId: null,
+      decidedByAgentId: null,
       decidedAt: null,
       updatedAt: new Date(),
     });
@@ -115,8 +125,42 @@ export function approvalRoutes(
       action: "approval.created",
       entityType: "approval",
       entityId: approval.id,
-      details: { type: approval.type, issueIds: uniqueIssueIds },
+      details: { type: approval.type, issueIds: uniqueIssueIds, reviewerAgentId },
     });
+
+    // For qa_review: wake up the designated reviewer agent immediately
+    if (approval.type === "qa_review" && reviewerAgentId) {
+      const linkedIssueIds = uniqueIssueIds;
+      const primaryIssueId = linkedIssueIds[0] ?? null;
+      try {
+        await heartbeat.wakeup(reviewerAgentId, {
+          source: "automation",
+          triggerDetail: "system",
+          reason: "qa_review_requested",
+          payload: {
+            approvalId: approval.id,
+            approvalType: "qa_review",
+            requestedByAgentId: approval.requestedByAgentId,
+            issueId: primaryIssueId,
+            issueIds: linkedIssueIds,
+          },
+          requestedByActorType: actor.actorType,
+          requestedByActorId: actor.actorId,
+          contextSnapshot: {
+            source: "approval.qa_review_requested",
+            approvalId: approval.id,
+            issueId: primaryIssueId,
+            issueIds: linkedIssueIds,
+            wakeReason: "qa_review_requested",
+          },
+        });
+      } catch (err) {
+        logger.warn(
+          { err, approvalId: approval.id, reviewerAgentId },
+          "failed to wake reviewer agent after qa_review approval creation",
+        );
+      }
+    }
 
     res.status(201).json(redactApprovalPayload(approval));
   });
@@ -357,6 +401,184 @@ export function approvalRoutes(
     });
 
     res.status(201).json(comment);
+  });
+
+  /**
+   * Agent-initiated approval for qa_review approvals.
+   * Only the designated reviewer agent (reviewerAgentId) may call this endpoint.
+   */
+  router.post("/approvals/:id/agent-approve", validate(agentResolveApprovalSchema), async (req, res) => {
+    const id = req.params.id as string;
+    const approval = await svc.getById(id);
+    if (!approval) {
+      res.status(404).json({ error: "Approval not found" });
+      return;
+    }
+    assertCompanyAccess(req, approval.companyId);
+
+    if (approval.type !== "qa_review") {
+      res.status(422).json({ error: "Only qa_review approvals can be resolved by an agent" });
+      return;
+    }
+
+    const actorAgentId = req.actor.type === "agent" ? req.actor.agentId : null;
+    if (!actorAgentId) {
+      res.status(403).json({ error: "Agent authentication required" });
+      return;
+    }
+    if (approval.reviewerAgentId !== actorAgentId) {
+      res.status(403).json({ error: "Only the designated reviewer agent may approve this request" });
+      return;
+    }
+
+    const { approval: updated, applied } = await svc.approveByAgent(id, actorAgentId, req.body.decisionNote);
+
+    if (applied) {
+      const linkedIssues = await issueApprovalsSvc.listIssuesForApproval(updated.id);
+      const linkedIssueIds = linkedIssues.map((issue) => issue.id);
+      const primaryIssueId = linkedIssueIds[0] ?? null;
+
+      const actor = getActorInfo(req);
+      await logActivity(db, {
+        companyId: updated.companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        action: "approval.agent_approved",
+        entityType: "approval",
+        entityId: updated.id,
+        details: {
+          type: updated.type,
+          reviewerAgentId: actorAgentId,
+          requestedByAgentId: updated.requestedByAgentId,
+          linkedIssueIds,
+        },
+      });
+
+      // Wake the requesting agent to notify them of the QA decision
+      if (updated.requestedByAgentId) {
+        try {
+          await heartbeat.wakeup(updated.requestedByAgentId, {
+            source: "automation",
+            triggerDetail: "system",
+            reason: "qa_review_approved",
+            payload: {
+              approvalId: updated.id,
+              approvalStatus: updated.status,
+              reviewerAgentId: actorAgentId,
+              issueId: primaryIssueId,
+              issueIds: linkedIssueIds,
+            },
+            requestedByActorType: actor.actorType,
+            requestedByActorId: actor.actorId,
+            contextSnapshot: {
+              source: "approval.qa_review_approved",
+              approvalId: updated.id,
+              approvalStatus: updated.status,
+              issueId: primaryIssueId,
+              issueIds: linkedIssueIds,
+              wakeReason: "qa_review_approved",
+            },
+          });
+        } catch (err) {
+          logger.warn(
+            { err, approvalId: updated.id, requestedByAgentId: updated.requestedByAgentId },
+            "failed to wake requester agent after qa_review approval",
+          );
+        }
+      }
+    }
+
+    res.json(redactApprovalPayload(updated));
+  });
+
+  /**
+   * Agent-initiated rejection for qa_review approvals.
+   * Only the designated reviewer agent (reviewerAgentId) may call this endpoint.
+   */
+  router.post("/approvals/:id/agent-reject", validate(agentResolveApprovalSchema), async (req, res) => {
+    const id = req.params.id as string;
+    const approval = await svc.getById(id);
+    if (!approval) {
+      res.status(404).json({ error: "Approval not found" });
+      return;
+    }
+    assertCompanyAccess(req, approval.companyId);
+
+    if (approval.type !== "qa_review") {
+      res.status(422).json({ error: "Only qa_review approvals can be resolved by an agent" });
+      return;
+    }
+
+    const actorAgentId = req.actor.type === "agent" ? req.actor.agentId : null;
+    if (!actorAgentId) {
+      res.status(403).json({ error: "Agent authentication required" });
+      return;
+    }
+    if (approval.reviewerAgentId !== actorAgentId) {
+      res.status(403).json({ error: "Only the designated reviewer agent may reject this request" });
+      return;
+    }
+
+    const { approval: updated, applied } = await svc.rejectByAgent(id, actorAgentId, req.body.decisionNote);
+
+    if (applied) {
+      const linkedIssues = await issueApprovalsSvc.listIssuesForApproval(updated.id);
+      const linkedIssueIds = linkedIssues.map((issue) => issue.id);
+      const primaryIssueId = linkedIssueIds[0] ?? null;
+
+      const actor = getActorInfo(req);
+      await logActivity(db, {
+        companyId: updated.companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        action: "approval.agent_rejected",
+        entityType: "approval",
+        entityId: updated.id,
+        details: {
+          type: updated.type,
+          reviewerAgentId: actorAgentId,
+          requestedByAgentId: updated.requestedByAgentId,
+          linkedIssueIds,
+        },
+      });
+
+      // Wake the requesting agent to notify them of the QA decision
+      if (updated.requestedByAgentId) {
+        try {
+          await heartbeat.wakeup(updated.requestedByAgentId, {
+            source: "automation",
+            triggerDetail: "system",
+            reason: "qa_review_rejected",
+            payload: {
+              approvalId: updated.id,
+              approvalStatus: updated.status,
+              reviewerAgentId: actorAgentId,
+              issueId: primaryIssueId,
+              issueIds: linkedIssueIds,
+            },
+            requestedByActorType: actor.actorType,
+            requestedByActorId: actor.actorId,
+            contextSnapshot: {
+              source: "approval.qa_review_rejected",
+              approvalId: updated.id,
+              approvalStatus: updated.status,
+              issueId: primaryIssueId,
+              issueIds: linkedIssueIds,
+              wakeReason: "qa_review_rejected",
+            },
+          });
+        } catch (err) {
+          logger.warn(
+            { err, approvalId: updated.id, requestedByAgentId: updated.requestedByAgentId },
+            "failed to wake requester agent after qa_review rejection",
+          );
+        }
+      }
+    }
+
+    res.json(redactApprovalPayload(updated));
   });
 
   return router;

@@ -10,10 +10,14 @@ export const approvals = pgTable(
     type: text("type").notNull(),
     requestedByAgentId: uuid("requested_by_agent_id").references(() => agents.id),
     requestedByUserId: text("requested_by_user_id"),
+    /** For qa_review approvals: the agent designated to review and decide */
+    reviewerAgentId: uuid("reviewer_agent_id").references(() => agents.id),
     status: text("status").notNull().default("pending"),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     decisionNote: text("decision_note"),
     decidedByUserId: text("decided_by_user_id"),
+    /** Set when an agent (rather than a board user) resolves the approval */
+    decidedByAgentId: uuid("decided_by_agent_id").references(() => agents.id),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
