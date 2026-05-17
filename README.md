@@ -1,3 +1,18 @@
+## Fork-Status (MikeGrote/paperclip)
+
+Dieser Fork unterscheidet sich vom Upstream (`paperclipai/paperclip`) aktuell vor allem in folgenden Punkten:
+
+- **Hermes ist vollständig externalisiert**: kein eingebautes `hermes_local` im Core, stattdessen Installation über den Adapter-Plugin-Manager (`@henkey/hermes-paperclip-adapter` oder `file:`-Pfad).
+- **Fork-spezifische UI-QoL-Patches**: `stderr_group`-Accordion, `tool_group`-Accordion und gekürzte Dashboard-Auszüge.
+- **Lokaler Betrieb**: Fork nutzt standardmäßig Port-Fallback auf `3101+`, wenn `3100` bereits belegt ist.
+
+### Plan & Realisierungsstand
+
+- [x] Hermes als externes Adapter-Plugin statt Core-Integration
+- [x] Plugin-basierte Adapter-Ladepfade ohne feste Hermes-Core-Abhängigkeit
+- [x] UI-QoL-Patches im Fork integriert
+- [ ] Laufende Upstream-Synchronisierung und Dokumentationsabgleich
+
 <p align="center">
   <img src="doc/assets/header.png" alt="Paperclip — runs your business" width="720" />
 </p>

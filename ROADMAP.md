@@ -12,6 +12,15 @@ If you want to extend Paperclip today, the best path is often the [plugin system
 
 For a concrete, mergeable issue-slicing plan for the first two open roadmap themes, see [doc/plans/2026-05-17-roadmap-execution-artifacts-and-outcomes.md](doc/plans/2026-05-17-roadmap-execution-artifacts-and-outcomes.md).
 
+## Fork Plan & Realisierungsstand (MikeGrote/paperclip)
+
+Der Fork verfolgt zusätzlich zum Upstream-Roadmap den Schwerpunkt, Hermes als externes Plugin zu betreiben und Fork-spezifische UI-Verbesserungen stabil zu halten.
+
+- [x] Hermes-Adapter aus dem Core entfernt und als externes Plugin vorgesehen
+- [x] Adapter-Plugin-Flow als primärer Integrationsweg für Hermes dokumentiert
+- [x] Fork-QoL-UI-Patches eingebracht und aktiv
+- [ ] Kontinuierlicher Upstream-Abgleich und Pflege der Fork-Dokumentation
+
 ## Milestones
 
 ### ✅ Plugin system
