@@ -6,6 +6,67 @@ Dieser Fork unterscheidet sich vom Upstream (`paperclipai/paperclip`) aktuell vo
 - **Fork-spezifische UI-QoL-Patches**: `stderr_group`-Accordion, `tool_group`-Accordion und gekürzte Dashboard-Auszüge.
 - **Lokaler Betrieb**: Fork nutzt standardmäßig Port-Fallback auf `3101+`, wenn `3100` bereits belegt ist.
 
+### Was in diesem Fork wichtig ist (Kurzfassung)
+
+Wenn du nur diese README liest, solltest du Folgendes mitnehmen:
+
+1. **Paperclip ist die Control Plane**, nicht der Agent selbst.
+2. **Hermes ist hier kein Core-Adapter**, sondern wird als externes Plugin installiert.
+3. **Der schnellste Start** ist lokal mit `pnpm dev` und eingebettetem PostgreSQL (kein `DATABASE_URL` nötig).
+4. **Ein Lauf = eine Firma mit klaren Strukturen**: Ziele, Org-Chart, Aufgaben, Heartbeats, Budgets, Governance.
+5. **Dieser Fork enthält zusätzliche UI-QoL-Verbesserungen**, die im Upstream so nicht zwingend enthalten sind.
+
+### Fork-Quickstart (MikeGrote/paperclip)
+
+Wenn du diesen Fork nutzen willst, verwende diese Schritte:
+
+```bash
+git clone https://github.com/MikeGrote/paperclip.git
+cd paperclip
+pnpm install
+pnpm dev
+```
+
+- API/UI starten lokal (Port-Fallback auf `3101+`, wenn `3100` belegt ist).
+- Die lokale DB läuft automatisch eingebettet, solange `DATABASE_URL` nicht gesetzt ist.
+
+Health-Checks:
+
+```bash
+curl http://localhost:3100/api/health
+curl http://localhost:3100/api/companies
+```
+
+Wenn `3100` belegt ist, nutze den tatsächlich ausgegebenen Port (`3101+`) entsprechend auch für die Health-Checks.
+
+### Hermes in diesem Fork (Plugin-only)
+
+In diesem Fork ist Hermes **absichtlich externalisiert**:
+
+- Kein eingebautes `hermes_local` im Core
+- Installation über den Adapter-Plugin-Manager (Board UI)
+- Paket z. B. `@henkey/hermes-paperclip-adapter` oder lokal per `file:`-Pfad
+
+Kurzablauf:
+
+1. Board öffnen → **Adapter manager**
+2. Hermes-Plugin installieren/laden
+3. Agent mit Typ `hermes_local` anlegen (nachdem Plugin geladen wurde)
+
+Optional für lokale Adapter-Entwicklung:
+
+- Eintrag in `~/.paperclip/adapter-plugins.json` mit `file:`-Pfad auf dein lokales Hermes-Adapter-Repo.
+
+### Doku-Navigation (was erklärt was)
+
+- `README.md` — Überblick, Positionierung, Quickstart
+- `doc/GOAL.md` — Projektziel
+- `doc/PRODUCT.md` — Produktdefinition
+- `doc/SPEC-implementation.md` — verbindlicher V1-Umsetzungsrahmen
+- `doc/DEVELOPING.md` — Entwicklung/Kommandos
+- `doc/DATABASE.md` — Datenbankmodi und Betrieb
+- `AGENTS.md` — Engineering-Regeln, Verifikation, Fork-Hinweise
+
 ### Plan & Realisierungsstand
 
 - [x] Hermes als externes Adapter-Plugin statt Core-Integration
